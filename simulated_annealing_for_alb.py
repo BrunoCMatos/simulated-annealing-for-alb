@@ -5,8 +5,8 @@ import time
 
 
 class SimulatedAnnealingForALB:
-    MIN_TEMPERATURE = 0.01
-    TEMPERATURE_TO_CHANGE_COOLING_RATE = 0.1
+    INFINITE_CYCLE_TIME = 100000
+    MIN_TEMPERATURE = 0.001
 
     def __init__(self, assembly_line):
         self.__assembly_line = assembly_line
@@ -19,7 +19,6 @@ class SimulatedAnnealingForALB:
         self.__optimal_solution = new_solution
         self.__cycle_time_optimal_solution = self.__cycle_time_current_solution
         self.moment_optimal_was_found = time.time()
-        random.seed(1)
 
 
     def run(self, initial_temperature, maximum_number_of_disturbances, cooling_rate):
@@ -41,13 +40,12 @@ class SimulatedAnnealingForALB:
                         self.moment_optimal_was_found = time.time()
                     self.__current_solution = new_solution
                     self.__cycle_time_current_solution = cycle_time
+                    if delta_e < 0:
+                        break
                 elif random.uniform(0, 1) <= self.__calculate_probability(delta_e, temperature):
                     self.__current_solution = new_solution
                     self.__cycle_time_current_solution = cycle_time
-            if self.TEMPERATURE_TO_CHANGE_COOLING_RATE < temperature:
-                temperature = temperature * cooling_rate[0]
-            else:
-                temperature = temperature * cooling_rate[1]
+            temperature = temperature * cooling_rate
 
     def __disturb_current_solution(self, solution):
         new_solution = []
@@ -162,21 +160,21 @@ class SimulatedAnnealingForALB:
             if len(workstations_a_workstation_depends_on[workstation.workstation_identification]) == 0 or \
                     len(workstations_a_workstation_preceeds[workstation.workstation_identification]) == 0:
                 continue
-            intersection_of_dependencies = workstations_a_workstation_depends_on[workstation.workstation_identification].\
-                intersection(workstations_a_workstation_preceeds[workstation.workstation_identification])
-            if len(intersection_of_dependencies) > 0:
-                return False, len(intersection_of_dependencies)
-        return True, 0
+            if len(workstations_a_workstation_depends_on[workstation.workstation_identification]
+                           .intersection(workstations_a_workstation_preceeds[workstation.workstation_identification])) > 0:
+                return False
+        return True
 
     def __calculate_cycle_time(self, solution):
+        if not self.__is_solution_is_valid(solution):
+            return self.INFINITE_CYCLE_TIME # penalizar soluções não factíveis
+
         max_cycle_time = 0
         for workstation in solution:
             workstation.calculate_cycle_time()
             if workstation.cycle_time > max_cycle_time:
                 max_cycle_time = workstation.cycle_time
-        is_valid, violated_precendences = self.__is_solution_is_valid(solution)
-        if not is_valid:
-            return max_cycle_time * violated_precendences # penalizar soluções não factíveis
+
         return max_cycle_time
 
     def get_current_solution(self):
